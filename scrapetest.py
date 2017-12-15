@@ -10,11 +10,15 @@ import socket
 random.seed(datetime.datetime.now())
 
 def getLinks(articleUrl):
-    timeout = 2
-    socket.setdefaulttimeout(timeout)
-    html = urlopen("http://en.wikipedia.org/wiki/Kevin_Bacon")
-    bsObj = BeautifulSoup(html,"lxml")
-    return bsObj.find("div",{"id":"bodyContent"}).findAll("a",href = re.compile("^(/wiki/)((?!:).)*$"))
+    NET_STATUS = False
+    while not NET_STATUS:
+        try:
+            html = urlopen("http://en.wikipedia.org/wiki/Kevin_Bacon",timeout=5)
+            bsObj = BeautifulSoup(html,"lxml")
+            return bsObj.find("div",{"id":"bodyContent"}).findAll("a",href = re.compile("^(/wiki/)((?!:).)*$"))
+        except socket.timeout:
+            print("网页未响应")
+            NET_STATUS = False
 
 links = getLinks("/wiki/Kevin_Bacon")
 while len(links) > 0:
