@@ -1,16 +1,19 @@
 import urllib
+import sys
+import requests
 from urllib import request
 from bs4 import BeautifulSoup
 import numpy
 import pandas as pd
 import matplotlib.pyplot as plt
 import jieba
+import time
 import codecs
 import matplotlib
 import re
 import pylab
 from wordcloud import WordCloud
-
+'''
 matplotlib.rcParams['figure.figsize'] = (10.0, 5.0)
 resp = request.urlopen('https://movie.douban.com/cinema/nowplaying/guangzhou/')
 html_data = resp.read().decode('utf-8')
@@ -25,27 +28,76 @@ for item in nowplaying_movie_list:
         nowplaying_dict['name'] = tag_img_item['alt']
         nowplaying_list.append(nowplaying_dict)
 
-def getComment( movieID , pagenum ):
-    if pagenum >0:
-        startnum = (pagenum-1)*20
-    requrl = 'https://movie.douban.com/subject/' + movieID + '/comments'+'?'+'start='+str(startnum)+'&limit=20'
-    headers = {'User-Agent':'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/61.0.3163.100 Safari/537.36'}
-    requestURL = urllib.request.Request(url=requrl,headers=headers)
+
+url_login = 'http://accounts.douban.com/login'
+s = requests.Session()
+formdata = {'source':'index_nav',
+             'redir':'https://www.douban.com',
+             'form_email':'am_cr',
+             'form_password':'cr930405'}
+headers = {'User-Agent':'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/61.0.3163.100 Safari/537.36'}
+r = s.post(url_login,data=formdata,headers = headers)
+content = r.text
+soup = BeautifulSoup(content , 'lxml')
+captcha = soup.find('img', id='captcha_image')
+
+if captcha:
+    captcha_url = captcha['src']
+    re_captcha_id = r'<input type-"hidden" name="captcha-id" value="(.*?)"/'
+    captcha_id = re.findall(re_captcha_id, content)
+    print(captcha_id)
+    print(captcha_url)
+    captcha_text = input('Please input 验证码')
+    formdata['captcha-solution'] = captcha_text
+    formdata['captcha-id'] = captcha_id
+    r = s.post(url_login,data = formdata,headers = headers)
+
+'''
+requrl = 'https://movie.douban.com/subject/' + '26862829' + '/comments'+'?'+'sort=new_score&status=P'
+headers = {
+        'User-Agent':'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/61.0.3163.100 Safari/537.36'}
+requestURL = urllib.request.Request(url=requrl,headers=headers)
+resp = urllib.request.urlopen(requestURL)
+html_data = resp.read().decode('utf-8')
+soup = BeautifulSoup(html_data,'lxml')
+comment_div_list = soup.find_all('div',class_ = 'comment')
+
+eachCommentList = []
+for item in comment_div_list:
+    if item.find_all('p')[0].string is not None:
+        eachCommentList.append(item.find_all('p')[0].string)
+next_ =  soup.find('a',{"class":"next"})
+print(next_)
+
+a_ = 0
+while next_.attrs['href'] is not None:
+    a_ += 1
+    requrl = 'https://movie.douban.com/subject/' + '26862829' + '/comments' + next_.attrs["href"]
+    requestURL = urllib.request.Request(url=requrl, headers=headers)
     resp = urllib.request.urlopen(requestURL)
     html_data = resp.read().decode('utf-8')
-    soup = BeautifulSoup(html_data,'lxml')
-    comment_div_list = soup.find_all('div',class_ = 'comment')
-
-    eachCommentList = []
+    soup = BeautifulSoup(html_data, 'lxml')
+    comment_div_list = soup.find_all('div', class_='comment')
+    print(a_)
     for item in comment_div_list:
         if item.find_all('p')[0].string is not None:
             eachCommentList.append(item.find_all('p')[0].string)
-    return eachCommentList
 
+count = 0
+for i in eachCommentList:
+    count += 1
+    print(count)
+    print(i)
+
+
+
+
+
+'''
 def main():
+
     commentList = []
-    NowPlayingMovie_list = nowplaying_list
-    for i in range(10):
+    for i in range(15):
         pagenum = i + 1
         commentList_temp = getComment(nowplaying_list[0]['id'], pagenum)
         commentList.append(commentList_temp)
@@ -80,3 +132,4 @@ def main():
 
 main()
 
+'''
