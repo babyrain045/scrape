@@ -1,65 +1,82 @@
-import requests
-import base64
-import re
 import urllib
-import urllib.parse
-import rsa
-import json
-import binascii
+from urllib import request
 from bs4 import BeautifulSoup
+import numpy
+import pandas as pd
+import matplotlib.pyplot as plt
+import jieba
+import codecs
+import matplotlib
+import re
+import pylab
+from wordcloud import WordCloud
 
-class Userlogin:
-    def userlogin(self,username,password,pagecount):
-        session = requests.Session()
-        url_prelogin = 'http://login.sina.com.cn/sso/prelogin.php?entry=weibo&callback=sinaSSOController.preloginCallBack&su=&rsakt=mod&client=ssologin.js(v1.4.5)&_=1364875106625'
-        url_login = 'http://login.sina.com.cn/sso/login.php?client=ssologin.js(v1.4.5)'
+matplotlib.rcParams['figure.figsize'] = (10.0, 5.0)
+resp = request.urlopen('https://movie.douban.com/cinema/nowplaying/guangzhou/')
+html_data = resp.read().decode('utf-8')
+soup = BeautifulSoup(html_data,'lxml')
+nowplaying_movie = soup.find_all('div',id = 'nowplaying')
+nowplaying_movie_list = nowplaying_movie[0].find_all('li', class_ = 'list-item')
+nowplaying_list = []
+for item in nowplaying_movie_list:
+    nowplaying_dict = {}
+    nowplaying_dict['id'] = item['data-subject']
+    for tag_img_item in item.find_all('img'):
+        nowplaying_dict['name'] = tag_img_item['alt']
+        nowplaying_list.append(nowplaying_dict)
 
-        resp = session.get(url_prelogin)
-        json_data = re.findall(r'(?<=\().*(?=\))',resp.text)[0]
-        data = json.loads(json_data)
+def getComment( movieID , pagenum ):
+    if pagenum >0:
+        startnum = (pagenum-1)*20
+    requrl = 'https://movie.douban.com/subject/' + movieID + '/comments'+'?'+'start='+str(startnum)+'&limit=20'
+    headers = {'User-Agent':'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/61.0.3163.100 Safari/537.36'}
+    requestURL = urllib.request.Request(url=requrl,headers=headers)
+    resp = urllib.request.urlopen(requestURL)
+    html_data = resp.read().decode('utf-8')
+    soup = BeautifulSoup(html_data,'lxml')
+    comment_div_list = soup.find_all('div',class_ = 'comment')
 
-        servertime = data['servertime']
-        nonce = data['nonce']
-        pubkey = data['pubkey']
-        rsakv = data['rsakv']
+    eachCommentList = []
+    for item in comment_div_list:
+        if item.find_all('p')[0].string is not None:
+            eachCommentList.append(item.find_all('p')[0].string)
+    return eachCommentList
 
-        print(urllib.parse.quote(username))
-        su = base64.b64encode(username.encode(encoding="utf-8"))
+def main():
+    commentList = []
+    NowPlayingMovie_list = nowplaying_list
+    for i in range(10):
+        pagenum = i + 1
+        commentList_temp = getComment(nowplaying_list[0]['id'], pagenum)
+        commentList.append(commentList_temp)
+    comments = ''
+    for i in range(len(commentList)):
+        comments = comments + (str(commentList[i])).strip()
 
-        rsaPublickey = int(pubkey,16)
-        key = rsa.PublicKey(rsaPublickey,65537)
-        message = str(servertime)+'/t'+str(nonce)+'\n' + str(password)
-        sp = binascii.b2a_hex(rsa.encrypt(message.encode(encoding="utf-8"),key))
-        postdata = {
-            'entry':'weibo',
-            'gateway':'1',
-            'from': '',
-            'savestate':'7',
-            'userticket': '1',
-            'ssosimplelogin':'1',
-            'vsnf':'1',
-            'vsnval':'',
-            'su':su,
-            'service':'miniblog',
-            'servertime':servertime,
-            'nonce':nonce,
-            'pwencode':'rsa2',
-            'sp':sp,
-            'encoding':'UTF-8',
-            'url':'http://weibo.com/ajaxlpgin.php?framelogin=1&callback=parent.parent.sinaSSOController.feedBackUrlCallBack',
-            'returntype':'META',
-            'rsakv':rsakv,
+    pattern = re.compile(r'[\u4e00-\u9fa5]+')
+    filterdata = re.findall(pattern,comments)
+    cleaned_comments = ''.join(filterdata)
+
+    segment = jieba.lcut(cleaned_comments)
+    words_df = pd.DataFrame({'segment':segment})
+
+    stopwords = pd.read_csv("stopwords.txt",index_col=False,quoting=3,sep="\t",names=['stopword'], encoding='GBK')
+    words_df = words_df[~words_df.segment.isin(stopwords.stopword)]
+
+    words_stat = words_df.groupby(by=['segment'])['segment'].agg({"计数": numpy.size})
+    words_stat = words_stat.reset_index().sort_values(by=["计数"], ascending=False)
+
+    wordcloud = WordCloud(font_path="simhei.ttf", background_color="white", max_font_size=80)
+    word_frequence = {x[0]: x[1] for x in words_stat.head(1000).values}
+
+    word_frequence_list = []
+    for key in word_frequence:
+        temp = (key, word_frequence[key])
+        word_frequence_list.append(temp)
+    wordcloud = wordcloud.fit_words(dict(word_frequence_list))
+    plt.imshow(wordcloud)
+    pylab.show()
 
 
-        }
-        resp = session.post(url_login,data=postdata)
+main()
 
-        print(resp.content)
-        login_url = re.findall(r'http://weibo.*&retcode=0',resp.text)
-
-        print(login_url)
-        respo = session.get(login_url[0])
-        uid = re.findall('"uniqueid":"(\d+)",',respo.text)[0]
-        url = "http://weibo.com/u/"+uid
-        respo = session.get(url)
-Userlogin.userlogin('','312469131@qq.com','uvyun_09',0)
