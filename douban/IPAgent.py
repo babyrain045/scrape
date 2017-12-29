@@ -38,7 +38,7 @@ def get_IPAgent():
         proxy_host = "http://" + ip[0] + ":" + ip[1]
         proxy_temp = {"http":proxy_host}
         proxys.append(proxy_temp)
-    print("已获得高匿IP，并存放与src目录中")
+    print("已获得高匿IP，并存放于src目录中")
     return proxys
 
 
